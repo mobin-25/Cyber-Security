@@ -3,7 +3,7 @@ import os
 import time
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from google import genai
+import google.generativeai as genai
 from dotenv import load_dotenv
 from detector import detect_scam
 
@@ -16,7 +16,7 @@ CORS(app)
 # --- CONFIGURATION ---
 # Hardcoded for demo stability to avoid .env visibility issues
 API_KEY = "AIzaSyDe90DUkG7ZA6Vmf8ReCvGERW8mQidpLk"
-client = genai.Client(api_key=API_KEY)
+genai.configure(api_key=API_KEY)
 
 # --- 1. AUDIO TRANSCRIPTION ENDPOINT (Member 2) ---
 @app.route('/api/transcribe', methods=['POST'])
@@ -29,16 +29,14 @@ def transcribe():
     
     try:
         audio_file.save(temp_path)
-        uploaded_file = client.files.upload(path=temp_path)
+        uploaded_file = genai.upload_file(path=temp_path)
 
         while uploaded_file.state.name == "PROCESSING":
             time.sleep(1)
-            uploaded_file = client.files.get(name=uploaded_file.name)
+            uploaded_file = genai.get_file(name=uploaded_file.name)
 
-        response = client.models.generate_content(
-            model='gemini-2.0-flash',
-            contents=[uploaded_file, "Transcribe this audio exactly into the text spoken."]
-        )
+        model = genai.GenerativeModel('gemini-2.0-flash')
+        response = model.generate_content([uploaded_file, "Transcribe this audio exactly into the text spoken."])
 
         os.remove(temp_path)
         return jsonify({"transcript": response.text})
@@ -56,10 +54,8 @@ def analyze():
 
     try:
         # Try the live Gemini AI first
-        response = client.models.generate_content(
-            model='gemini-2.0-flash',
-            contents=f"Analyze this scam text and return ONLY JSON: {text}"
-        )
+        model = genai.GenerativeModel('gemini-2.0-flash')
+        response = model.generate_content(f"Analyze this scam text and return ONLY JSON: {text}")
         
         # Parse the AI response
         clean_text = response.text.replace("```json", "").replace("```", "").strip()
