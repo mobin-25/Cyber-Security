@@ -5,6 +5,7 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 from google import genai
 from dotenv import load_dotenv
+from detector import detect_scam
 
 # Load environment variables (optional now since key is hardcoded for demo)
 load_dotenv()
@@ -65,20 +66,15 @@ def analyze():
         return jsonify(json.loads(clean_text))
 
     except Exception as e:
-        # 🚨 QUOTA/API FALLBACK 🚨
-        # If 'Quota Exceeded' or any error occurs, return this perfect demo response
-        print(f"AI API Failed or Limit Hit: {e}. Using Demo Fallback.")
+        # 🚨 FALLBACK 1: Use built-in keyword detector 🚨
+        print(f"AI API Failed or Limit Hit: {e}. Using Keyword Detector Fallback.")
+        
+        risk, detected = detect_scam(text)
         
         return jsonify({
-            "risk_level": "HIGH",
-            "score": 98,
-            "language_detected": "Hindi/Regional",
-            "flagged_phrases": [
-                {"text": "OTP 4821", "reason": "Request for sensitive banking credentials"},
-                {"text": "खाता बंद", "reason": "Urgency tactic through fear of account closure"}
-            ],
-            "tactics": ["urgency", "otp_request", "authority_claim", "fear"],
-            "summary": "High-risk phishing attempt detected. The message uses fear of account closure to steal banking credentials."
+            "risk": risk,
+            "detected": detected,
+            "method": "keyword_detection"
         })
 
 if __name__ == '__main__':
